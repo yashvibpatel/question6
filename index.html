@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cinematic VFX Page</title>
+
+<style>
+html,body{
+    margin:0;
+    padding:0;
+    background:#000;
+    overflow:hidden;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+canvas{
+    position:fixed;
+    top:0;
+    left:0;
+}
+
+#overlay{
+    position:absolute;
+    width:100%;
+    height:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    pointer-events:none;
+}
+
+h1{
+    font-size:80px;
+    color:white;
+    letter-spacing:10px;
+    animation: glitch 2s infinite;
+    text-shadow:
+        0 0 10px cyan,
+        0 0 40px blue,
+        0 0 80px purple;
+}
+
+h2{
+    color:#aaa;
+    letter-spacing:5px;
+    margin-top:20px;
+}
+
+@keyframes glitch{
+    0%{transform:translate(0)}
+    20%{transform:translate(-2px,2px)}
+    40%{transform:translate(2px,-2px)}
+    60%{transform:translate(-1px,1px)}
+    80%{transform:translate(1px,-1px)}
+    100%{transform:translate(0)}
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="bg"></canvas>
+<canvas id="fx"></canvas>
+
+<div id="overlay">
+    <h1>VFX WORLD</h1>
+    <h2>Cinematic Motion Graphics</h2>
+</div>
+
+<script>
+const bg = document.getElementById("bg");
+const fx = document.getElementById("fx");
+const bctx = bg.getContext("2d");
+const fctx = fx.getContext("2d");
+
+function resize(){
+    bg.width = fx.width = innerWidth;
+    bg.height = fx.height = innerHeight;
+}
+resize();
+addEventListener("resize", resize);
+
+let mouse = {x: innerWidth/2, y: innerHeight/2};
+addEventListener("mousemove", e=>{
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+});
+
+// ===== BACKGROUND NEBULA =====
+let stars = [];
+for(let i=0;i<400;i++){
+    stars.push({
+        x:Math.random()*bg.width,
+        y:Math.random()*bg.height,
+        r:Math.random()*2,
+        a:Math.random()*Math.PI*2
+    });
+}
+
+// ===== PARTICLES =====
+let particles=[];
+for(let i=0;i<800;i++){
+    particles.push({
+        x:Math.random()*fx.width,
+        y:Math.random()*fx.height,
+        vx:(Math.random()-0.5)*1.5,
+        vy:(Math.random()-0.5)*1.5,
+        life:Math.random()*300,
+        hue:Math.random()*360
+    });
+}
+
+let t=0;
+function animate(){
+    t+=0.01;
+
+    // BACKGROUND
+    bctx.fillStyle="rgba(0,0,20,0.4)";
+    bctx.fillRect(0,0,bg.width,bg.height);
+
+    stars.forEach(s=>{
+        s.a+=0.001;
+        let x=s.x+Math.cos(s.a)*20;
+        let y=s.y+Math.sin(s.a)*20;
+        bctx.fillStyle="white";
+        bctx.fillRect(x,y,s.r,s.r);
+    });
+
+    // FX LAYER
+    fctx.fillStyle="rgba(0,0,0,0.25)";
+    fctx.fillRect(0,0,fx.width,fx.height);
+
+    // ENERGY RINGS
+    for(let i=0;i<5;i++){
+        fctx.beginPath();
+        fctx.arc(
+            fx.width/2,
+            fx.height/2,
+            150+i*60+Math.sin(t+i)*30,
+            0,Math.PI*2
+        );
+        fctx.strokeStyle=`hsla(${t*50+i*60},100%,60%,0.4)`;
+        fctx.lineWidth=3;
+        fctx.shadowBlur=30;
+        fctx.shadowColor="cyan";
+        fctx.stroke();
+    }
+
+    // PARTICLES
+    particles.forEach(p=>{
+        p.x+=p.vx;
+        p.y+=p.vy;
+        p.life--;
+        if(p.life<0){
+            p.x=mouse.x;
+            p.y=mouse.y;
+            p.life=300;
+        }
+        fctx.beginPath();
+        fctx.arc(p.x,p.y,2,0,Math.PI*2);
+        fctx.fillStyle=`hsla(${p.hue+t*50},100%,60%,0.8)`;
+        fctx.shadowBlur=20;
+        fctx.shadowColor="white";
+        fctx.fill();
+    });
+
+    // LIGHT FOLLOW
+    let g=fctx.createRadialGradient(
+        mouse.x,mouse.y,0,
+        mouse.x,mouse.y,300
+    );
+    g.addColorStop(0,"rgba(0,255,255,0.15)");
+    g.addColorStop(1,"rgba(0,0,0,0)");
+    fctx.fillStyle=g;
+    fctx.fillRect(0,0,fx.width,fx.height);
+
+    requestAnimationFrame(animate);
+}
+animate();
+</script>
+
+</body>
+</html>
