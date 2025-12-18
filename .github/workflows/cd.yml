@@ -1,0 +1,50 @@
+name: CD - Deploy to EC2
+on:
+  workflow_run:
+    workflows: ["CI - Build & Push Docker Image"]
+    types:
+      - completed
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH to EC2
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.HOST_DNS }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            IMAGE=${{ secrets.DOCKER_USERNAME }}/myapp
+            TAG=${{ github.event.workflow_run.head_sha }}
+            echo " Installing Docker..."
+            sudo apt-get update -y
+            sudo apt-get install -y ca-certificates curl gnupg lsof
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker.gpg
+            echo \
+              "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu noble stable" \
+              | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+            sudo apt-get update -y
+            sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+            PORT=8080
+            echo "Checking if port $PORT is in use..."
+            if sudo lsof -i:$PORT -t >/dev/null ; then
+              echo " Port $PORT in use — killing process..."
+              sudo kill -9 $(sudo lsof -i:$PORT -t)
+              echo " Waiting for port $PORT to be released..."
+              while sudo lsof -i:$PORT -t >/dev/null; do
+                sleep 1
+              done
+            fi
+            echo " Stopping old Docker container..."
+            sudo docker stop myapp || true
+            sudo docker rm myapp || true
+            echo " Waiting for Docker to release resources..."
+            sleep 2
+            echo " Pulling latest image: $IMAGE:$TAG"
+            sudo docker pull $IMAGE:$TAG
+            echo " Starting new container..."
+            sudo docker run -d --name myapp -p 8081:80 $IMAGE:$TAG
+            echo "Deployment Complete!"
